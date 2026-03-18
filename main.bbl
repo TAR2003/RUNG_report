@@ -1,0 +1,76 @@
+%%% -*-BibTeX-*-
+%%% Do NOT edit. File created by BibTeX with style
+%%% ACM-Reference-Format-Journals [18-Jan-2012].
+
+\begin{thebibliography}{5}
+
+%%% ====================================================================
+%%% NOTE TO THE USER: you can override these defaults by providing
+%%% customized versions of any of these macros before the \bibliography
+%%% command.  Each of them MUST provide its own final punctuation,
+%%% except for \shownote{}, \showDOI{}, and \showURL{}.  The latter two
+%%% do not use final punctuation, in order to avoid confusing it with
+%%% the Web address.
+%%%
+%%% To suppress output of a particular field, define its macro to expand
+%%% to an empty string, or better, \unskip, like this:
+%%%
+%%% \newcommand{\showDOI}[1]{\unskip}   % LaTeX syntax
+%%%
+%%% \def \showDOI #1{\unskip}           % plain TeX syntax
+%%%
+%%% ====================================================================
+
+\ifx \showCODEN    \undefined \def \showCODEN     #1{\unskip}     \fi
+\ifx \showDOI      \undefined \def \showDOI       #1{#1}\fi
+\ifx \showISBNx    \undefined \def \showISBNx     #1{\unskip}     \fi
+\ifx \showISBNxiii \undefined \def \showISBNxiii  #1{\unskip}     \fi
+\ifx \showISSN     \undefined \def \showISSN      #1{\unskip}     \fi
+\ifx \showLCCN     \undefined \def \showLCCN      #1{\unskip}     \fi
+\ifx \shownote     \undefined \def \shownote      #1{#1}          \fi
+\ifx \showarticletitle \undefined \def \showarticletitle #1{#1}   \fi
+\ifx \showURL      \undefined \def \showURL       {\relax}        \fi
+% The following commands are used for tagged output and should be
+% invisible to TeX
+\providecommand\bibfield[2]{#2}
+\providecommand\bibinfo[2]{#2}
+\providecommand\natexlab[1]{#1}
+\providecommand\showeprint[2][]{arXiv:#2}
+
+\bibitem[Fan and Li(2001)]%
+        {fan2001}
+\bibfield{author}{\bibinfo{person}{Jianqing Fan} {and} \bibinfo{person}{Runze Li}.} \bibinfo{year}{2001}\natexlab{}.
+\newblock \showarticletitle{Variable Selection via Nonconcave Penalized Likelihood and Its Oracle Properties}.
+\newblock \bibinfo{journal}{\emph{J. Amer. Statist. Assoc.}} \bibinfo{volume}{96}, \bibinfo{number}{456} (\bibinfo{year}{2001}), \bibinfo{pages}{1348--1360}.
+\newblock
+
+
+\bibitem[Hou et~al\mbox{.}(2024)]%
+        {hou2024rung}
+\bibfield{author}{\bibinfo{person}{Zhetao Hou}, \bibinfo{person}{Rui Feng}, \bibinfo{person}{Tyler Derr}, {and} \bibinfo{person}{Xiao Liu}.} \bibinfo{year}{2024}\natexlab{}.
+\newblock \showarticletitle{Robust Graph Neural Networks via Unbiased Aggregation}. In \bibinfo{booktitle}{\emph{Advances in Neural Information Processing Systems (NeurIPS)}}. \bibinfo{publisher}{Curran Associates, Inc.}
+\newblock
+
+
+\bibitem[Jin et~al\mbox{.}(2020)]%
+        {jin2020prognn}
+\bibfield{author}{\bibinfo{person}{Wei Jin} {et~al\mbox{.}}} \bibinfo{year}{2020}\natexlab{}.
+\newblock \showarticletitle{Graph Structure Learning for Robust Graph Neural Networks}. In \bibinfo{booktitle}{\emph{Proceedings of the 26th ACM SIGKDD Conference on Knowledge Discovery and Data Mining}}. \bibinfo{publisher}{Association for Computing Machinery}, \bibinfo{pages}{66--76}.
+\newblock
+
+
+\bibitem[Li et~al\mbox{.}(2018)]%
+        {li2018deeper}
+\bibfield{author}{\bibinfo{person}{Qimai Li}, \bibinfo{person}{Zhichao Han}, {and} \bibinfo{person}{Xiao-Ming Wu}.} \bibinfo{year}{2018}\natexlab{}.
+\newblock \showarticletitle{Deeper Insights into Graph Convolutional Networks for Semi-Supervised Learning}. In \bibinfo{booktitle}{\emph{Proceedings of the AAAI Conference on Artificial Intelligence}}. \bibinfo{publisher}{AAAI Press}, \bibinfo{pages}{3538--3545}.
+\newblock
+
+
+\bibitem[Pei et~al\mbox{.}(2020)]%
+        {pei2020geomgcn}
+\bibfield{author}{\bibinfo{person}{Hongbin Pei}, \bibinfo{person}{Bo Wei}, \bibinfo{person}{Kevin Chen-Chuan Chang}, \bibinfo{person}{Yu Lei}, {and} \bibinfo{person}{Bo Yang}.} \bibinfo{year}{2020}\natexlab{}.
+\newblock \showarticletitle{Geom-GCN: Geometric Graph Convolutional Networks}. In \bibinfo{booktitle}{\emph{International Conference on Learning Representations (ICLR)}}. \bibinfo{publisher}{OpenReview.net}.
+\newblock
+
+
+\end{thebibliography}
