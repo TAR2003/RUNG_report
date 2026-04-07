@@ -441,6 +441,101 @@ We compare three models:
   with percentile-based threshold.
 \end{itemize}
 
+\subsection{Quantitative Results}
+
+Table~\ref{tab:final-performance} summarizes the clean accuracy and the robustness
+at the strongest adaptive PGD attack budget (100\%) for all three models across
+six datasets. The detailed per-budget values, training logs, and full run outputs
+are available in the repository under the root `log/` directory.
+
+\begin{table*}[!ht]
+  \centering
+  \small
+  \caption{Clean accuracy and 100\% adaptive-PGD attack accuracy for RUNG,
+  RUNG\_percentile\_gamma, and RUNG\_learnable\_distance.}
+  \label{tab:final-performance}
+  \begin{tabular}{llcc}
+    \toprule
+    Dataset & Model & Clean acc. & 100\% budget acc. \\
+    \midrule
+    Cora & RUNG & 81.33\% $\pm$ 0.87 & 52.92\% $\pm$ 0.97 \\
+    & RUNG\_percentile\_gamma & 78.59\% $\pm$ 1.38 & 61.97\% $\pm$ 10.41 \\
+    & RUNG\_learnable\_distance & 78.05\% $\pm$ 0.96 & 75.38\% $\pm$ 2.10 \\
+    \addlinespace
+    Citeseer & RUNG & 70.79\% $\pm$ 0.91 & 48.38\% $\pm$ 0.94 \\
+    & RUNG\_percentile\_gamma & 70.19\% $\pm$ 1.63 & 56.71\% $\pm$ 6.37 \\
+    & RUNG\_learnable\_distance & 71.34\% $\pm$ 1.74 & 63.47\% $\pm$ 2.83 \\
+    \addlinespace
+    Pubmed & RUNG & 67.64\% $\pm$ 2.29 & 56.93\% $\pm$ 2.16 \\
+    & RUNG\_percentile\_gamma & 70.66\% $\pm$ 2.36 & 66.72\% $\pm$ 2.27 \\
+    & RUNG\_learnable\_distance & 71.27\% $\pm$ 2.24 & 70.26\% $\pm$ 2.44 \\
+    \addlinespace
+    Chameleon & RUNG & 41.53\% $\pm$ 1.05 & 14.52\% $\pm$ 2.53 \\
+    & RUNG\_percentile\_gamma & 39.44\% $\pm$ 0.72 & 32.29\% $\pm$ 5.46 \\
+    & RUNG\_learnable\_distance & 44.27\% $\pm$ 1.18 & 40.48\% $\pm$ 4.44 \\
+    \addlinespace
+    Wisconsin & RUNG & 53.13\% $\pm$ 7.50 & 34.23\% $\pm$ 6.54 \\
+    & RUNG\_percentile\_gamma & 59.00\% $\pm$ 3.78 & 49.95\% $\pm$ 3.76 \\
+    & RUNG\_learnable\_distance & 59.20\% $\pm$ 4.47 & 61.19\% $\pm$ 3.37 \\
+    \addlinespace
+    Cornell & RUNG & 45.17\% $\pm$ 5.77 & 30.34\% $\pm$ 7.21 \\
+    & RUNG\_percentile\_gamma & 44.90\% $\pm$ 0.43 & 41.63\% $\pm$ 4.09 \\
+    & RUNG\_learnable\_distance & 49.93\% $\pm$ 3.98 & 47.62\% $\pm$ 2.43 \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+Table~\ref{tab:percentile-gamma} reports the per-layer adaptive threshold values
+that RUNG\_percentile\_gamma computed on Cora. Table~\ref{tab:cosine-stats}
+reports the per-layer cosine distance statistics for RUNG\_learnable\_distance
+on Cora.
+
+\begin{table}[!ht]
+  \centering
+  \small
+  \caption{Layer-wise percentile gamma values for RUNG\_percentile\_gamma on Cora.}
+  \label{tab:percentile-gamma}
+  \begin{tabular}{cr}
+    \toprule
+    Layer & $\gamma$ \\
+    \midrule
+    0 & 3.6571 \\
+    1 & 3.2985 \\
+    2 & 3.1846 \\
+    3 & 3.1407 \\
+    4 & 3.1705 \\
+    5 & 3.1592 \\
+    6 & 3.1544 \\
+    7 & 3.1394 \\
+    8 & 3.1445 \\
+    9 & 3.1406 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table*}[!ht]
+  \centering
+  \small
+  \caption{Layer-wise cosine distance statistics for RUNG\_learnable\_distance on Cora.}
+  \label{tab:cosine-stats}
+  \begin{tabular}{crrrr}
+    \toprule
+    Layer & $\gamma$ & $\mathrm{mean}(y)$ & $\mathrm{std}(y)$ & $\max(y)$ \\
+    \midrule
+    0 & 0.3755 & 0.7520 & 0.3903 & 1.7692 \\
+    1 & 0.2494 & 0.7485 & 0.3962 & 1.7407 \\
+    2 & 0.2321 & 0.7499 & 0.3999 & 1.7128 \\
+    3 & 0.2234 & 0.7524 & 0.4012 & 1.6956 \\
+    4 & 0.2209 & 0.7527 & 0.4020 & 1.6956 \\
+    5 & 0.2115 & 0.7534 & 0.4022 & 1.6956 \\
+    6 & 0.2132 & 0.7536 & 0.4025 & 1.6956 \\
+    7 & 0.2065 & 0.7542 & 0.4027 & 1.6956 \\
+    8 & 0.2124 & 0.7544 & 0.4029 & 1.6956 \\
+    9 & 0.2030 & 0.7547 & 0.4030 & 1.6956 \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
 \subsection{Results}
 
 Figures~\ref{fig:cora}--\ref{fig:cornell} show the robustness curves on all six
