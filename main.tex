@@ -1,268 +1,672 @@
 \documentclass[sigconf]{acmart}
 
 \AtBeginDocument{%
-	\providecommand\BibTeX{{%
-		Bib\TeX}}}
+  \providecommand\BibTeX{{%
+  Bib\TeX}}}
 
 \usepackage{graphicx}
 \usepackage{amsmath}
+\let\Bbbk\relax
+\usepackage{amssymb}
 \usepackage{placeins}
+\usepackage{booktabs}
 
 \begin{document}
 
-\title{Project Progress Report: Improving RUNG for Robust Graph Aggregation}
+\title[Improving RUNG]{Improving RUNG: Adaptive Thresholding and Learnable Cosine Distance for Robust Graph Neural Networks}
 
-\author{Tawkir Aziz Rahman \\ 2005090}
-\affiliation{%
-	\institution{Bangladesh University of Engineering and Technology}
-	\city{Dhaka}
-	\country{Bangladesh}
+\author{Tawkir Aziz Rahman}
+\authornote{Student ID: 2005090}
+\affiliation{% 
+  \institution{Bangladesh University of Engineering and Technology}
+  \city{Dhaka}
+  \country{Bangladesh}
 }
 
-\author{Dipanta Kumar Roy Nobo \\ 2005074}
-\affiliation{%
-	\institution{Bangladesh University of Engineering and Technology}
-	\city{Dhaka}
-	\country{Bangladesh}
+\author{Dipanta Kumar Roy Nobo}
+\authornote{Student ID: 2005074}
+\affiliation{% 
+  \institution{Bangladesh University of Engineering and Technology}
+  \city{Dhaka}
+  \country{Bangladesh}
 }
 
-\renewcommand{\shortauthors}{Project Team}
+\renewcommand{\shortauthors}{Tawkir and Nobo}
 
 \begin{abstract}
-This report presents our project progress on improving RUNG (Robust UNbiased Neighborhood Graph aggregation) for robust Graph Neural Networks under Adaptive Attack settings. We start from the RUNG 2024 NeurIPS foundation and test three improvements: Percentile Gamma, Parametric Gamma, and Learnable Cosine Distance, followed by a combined model. We compare behavior on homophilic and heterophilic datasets, discuss what is working now, and list the remaining gaps we plan to address before the final project presentation.
+This report describes our project on improving RUNG, a robust Graph Neural
+Network published at NeurIPS 2024. RUNG uses a non-convex penalty called MCP to
+remove suspicious edges during message passing. It works well, but it has a clear
+weakness: its edge-suspiciousness threshold is fixed before training and stays fixed
+across all layers. When an attacker changes the attack budget, or when features
+smooth out in deeper layers, that fixed threshold becomes wrong. We built two
+improvements on top of the RUNG model. The first is a Percentile Gamma system
+that computes the threshold from real edge-distance statistics at each layer. The
+second is a Learnable Cosine Distance module that replaces the Euclidean distance
+used in RUNG with cosine similarity, and allows the network to learn the best
+geometric space to compare nodes. We test both methods on six datasets: Cora,
+Citeseer, Pubmed, Chameleon, Wisconsin, and Cornell. Both methods clearly
+outperform the original RUNG. The cosine distance model is the strongest
+result: it holds accuracy under very high attack budgets on every dataset,
+including heterophilic graphs where RUNG fails badly. The time complexity of
+both methods is exactly the same as the original RUNG.
 \end{abstract}
 
 \ccsdesc[500]{Computing methodologies~Learning from graph data}
 \ccsdesc[300]{Security and privacy~Adversarial learning}
 
-\keywords{Graph Neural Networks, RUNG, RUGE, Adaptive Attack, Estimation Bias, Percentile Gamma, Parametric Gamma, Learnable Distance, Heterophily}
+\keywords{Graph Neural Networks, Robust GNN, RUNG, RUGE, Adaptive Attack,
+Percentile Gamma, Learnable Cosine Distance, Heterophily, MCP, PGD Attack}
 
 \maketitle
 
-\section{Introduction}
-The base paper for this project is RUNG 2024 NeurIPS, ``Robust Graph Neural Networks via Unbiased Aggregation'' \cite{hou2024rung}. RUNG means Robust UNbiased Neighborhood Graph aggregation. It is designed for robust graph aggregation techniques for Graph Neural Networks.
+%%------------------------------------------------------------------------
+\section{Introduction and Background}
+%%------------------------------------------------------------------------
 
-The core problem is that many GNNs can face adaptive attacks. Attackers can add fake edges among nodes and disrupt the result. Many graph signal estimators exist and do work, but they fail badly in one case: when the attacker knows the model and the dataset. If the attacker knows the parameters, they can attack in an adaptive way and break those defenses.
+\subsection{What Are Graph Neural Networks?}
 
-Previous defenses include two regularization styles, often described as \(\ell_1\) and \(\ell_2\) defense. The \(\ell_1\) defense uses an absolute penalty, while \(\ell_2\) uses a squared penalty. In both styles, the algorithm checks edges and assigns weights. Suspicious edges get larger penalties so they cannot hurt the graph as much.
+A Graph Neural Network (GNN) is a machine learning model that works on
+graph-structured data. A graph is a collection of nodes (also called vertices)
+and edges (connections between nodes). Examples include citation networks,
+where papers are nodes and citations are edges, or social networks, where
+people are nodes and friendships are edges.
 
-The problem appears when the attack budget is high, meaning the attacker can inject many fake edges. Even after weighting and penalizing, those fake edges still influence the final aggregation and shift the estimate. This is the Estimation Bias problem \cite{fan2001}. For \(\ell_1\) penalty, the values still pull the estimate over time. For \(\ell_2\), the shift is often worse because squared penalties can deviate further from the original signal.
+The main idea in a GNN is \emph{message passing}. Every node collects
+feature information from its neighbors, combines that information, and updates
+its own representation. After several rounds of this, each node has a richer
+representation that encodes both its own features and the structure of its
+neighborhood. This representation is then used for tasks like classifying a
+node into a category.
 
-RUNG addresses this with an unbiased strategy. Instead of only reducing suspicious edge weights, it can force them to zero if they are highly suspicious. The goal is Unbiased Aggregation: if an edge crosses a suspicious threshold, sever it completely.
+Formally, a GNN learns a feature matrix $\mathbf{F} \in \mathbb{R}^{n \times d}$,
+where $n$ is the number of nodes and $d$ is the feature dimension. Each row
+$\mathbf{f}_i$ is the feature vector of node $i$. The graph structure is stored
+in an adjacency matrix $\mathbf{A} \in \{0,1\}^{n \times n}$, where $A_{ij} = 1$
+means there is an edge between nodes $i$ and $j$.
 
-RUNG does this through the Robust and Unbiased Graph signal Estimator (RUGE) \cite{hou2024rung}. The estimator uses MCP-based weighting to decide whether an edge should contribute or be pruned:
+\subsection{What Are Adversarial Attacks on GNNs?}
+
+GNNs are vulnerable to \emph{adversarial attacks}. An adversary (attacker) can
+deliberately corrupt the graph to make the GNN give wrong predictions.
+
+The most dangerous kind is an \emph{adaptive attack}. In an adaptive attack,
+the attacker knows which model they are attacking and its exact parameters.
+They specifically design perturbations to break that model. This is much harder
+to defend against than a \emph{transfer attack}, where the attacker generates
+perturbations against a different model and hopes they carry over.
+
+The most common adaptive attack used in research is the PGD (Projected
+Gradient Descent) attack~\cite{xu2019pgd}. PGD works by:
+\begin{enumerate}
+  \item Starting with the clean graph adjacency matrix $\mathbf{A}$.
+  \item Computing the gradient of an attack loss function with respect to $\mathbf{A}$,
+  treating the adjacency matrix as a continuous variable.
+  \item Taking a step in the direction that most damages the model's predictions.
+  \item Projecting the result back to a valid adjacency matrix (binary, within
+  a budget of allowed edge changes).
+  \item Repeating this many times.
+\end{enumerate}
+The \emph{attack budget} is defined as the fraction of existing edges that the
+attacker is allowed to add or delete. A 20\% budget means the attacker can
+change up to 20\% of the original edge count. Higher budget means a stronger
+attack.
+
+\subsection{What Is RUNG and What Does It Do?}
+
+RUNG stands for Robust UNbiased Graph aggregation. It was published at NeurIPS
+2024~\cite{hou2024rung}. The core observation in RUNG is that older robust GNN
+methods like SoftMedian, TWIRLS, and ElasticGNN all share the same underlying
+design: they use $\ell_1$-based graph smoothing to penalize large feature
+differences between connected nodes. This makes them more robust than standard
+GNNs, but they still fail under large attack budgets because $\ell_1$
+regularization introduces an \emph{estimation bias}.
+
+\textbf{What is estimation bias?} When the $\ell_1$ penalty shrinks an edge
+weight, it shrinks it by a fixed constant. This means every fake edge the
+attacker adds causes a constant error in the final estimate. As the attacker
+adds more fake edges, those errors accumulate. This is the bias. RUNG's
+analysis shows that this accumulated bias explains why $\ell_1$-based GNNs
+degrade badly when the attack budget is large.
+
+RUNG fixes this with an unbiased estimator. It uses the
+\emph{Minimax Concave Penalty} (MCP)~\cite{zhang2010mcp}, a non-convex penalty
+that behaves like $\ell_1$ for small differences, but becomes a constant for
+large differences. The transition point is controlled by a threshold $\gamma$.
+When the feature difference between two nodes exceeds $\gamma$, the edge weight
+becomes exactly zero. That edge is completely pruned. This means fake edges with
+large feature differences are cut out entirely, not just down-weighted. This is
+the key to removing the bias.
+
+\textbf{How does RUNG achieve this?} RUNG defines the Robust and Unbiased Graph
+signal Estimator (RUGE):
 
 \begin{equation}
-\arg\min_{\mathbf{F}}\,\mathcal{H}(\mathbf{F})=
-\sum_{(i,j)\in\mathcal{E}}\rho_{\gamma}\left(\left\lVert\frac{\mathbf{f}_i}{\sqrt{d_i}}-\frac{\mathbf{f}_j}{\sqrt{d_j}}\right\rVert_2\right)
-+\lambda\sum_{i\in\mathcal{V}}\lVert\mathbf{f}_i-\mathbf{f}^{(0)}_i\rVert_2^2
-\label{eq:ruge_obj}
+\arg\min_{\mathbf{F}}\;\mathcal{H}(\mathbf{F}) =
+\sum_{(i,j)\in\mathcal{E}} \rho_\gamma\!\left(\left\lVert
+\frac{\mathbf{f}_i}{\sqrt{d_i}} - \frac{\mathbf{f}_j}{\sqrt{d_j}}
+\right\rVert_2\right)
++ \lambda \sum_{i\in\mathcal{V}} \lVert \mathbf{f}_i - \mathbf{f}_i^{(0)} \rVert_2^2
+\label{eq:ruge}
 \end{equation}
 
+Here $d_i$ and $d_j$ are the degrees (number of connections) of nodes $i$ and
+$j$. Dividing by $\sqrt{d_i}$ is degree normalization, which prevents high-degree
+nodes from dominating the computation. $\mathbf{f}_i^{(0)}$ is the original
+input feature. $\lambda$ controls how strongly each node stays close to its
+input feature.
+
+The MCP penalty function is:
 \begin{equation}
-\rho_{\gamma}(y)=
+\rho_\gamma(y) =
 \begin{cases}
-y-\dfrac{y^2}{2\gamma}, & y<\gamma\\
-\dfrac{\gamma}{2}, & y\ge\gamma
+y - \dfrac{y^2}{2\gamma}, & y < \gamma \\
+\dfrac{\gamma}{2}, & y \ge \gamma
 \end{cases}
-\label{eq:mcp_penalty}
+\label{eq:mcp}
 \end{equation}
 
-The MCP form in Eq.~\ref{eq:mcp_penalty} follows the same non-convex penalty family discussed in statistical learning \cite{fan2001} and is the key reason RUGE can reduce bias while preserving robust behavior. This is the foundation we built on in our project.
+When $y < \gamma$, the penalty grows like $\ell_1$. When $y \ge \gamma$, the
+penalty is a constant, so its derivative is zero, so the edge gets zero weight
+and is effectively removed.
 
-\section{Materials and Methods}
-\subsection{Datasets}
-We evaluate on homophilic datasets (Cora, Citeseer, Pubmed) and heterophilic datasets (Cornell, Wisconsin, Chameleon). The heterophilic benchmarks are standard in Geom-GCN \cite{pei2020geomgcn}. We included them because the base RUNG paper is mainly stronger for homophilic graphs, and we wanted to test what happens when class-connected neighbors are less similar.
+To solve this optimization problem efficiently, RUNG uses an algorithm called
+Quasi-Newton Iteratively Reweighted Least Squares (QN-IRLS). The key update
+rule is:
 
-\subsection{Base Architecture and Training Context}
-Our starting point is the RUNG architecture with the RUGE estimator and MCP penalty \cite{hou2024rung}. The training setup follows the same robust aggregation idea under Adaptive Attack conditions. In our progress stage, we focused on modifying the thresholding and distance components while keeping the core backbone stable.
+\begin{equation}
+\mathbf{F}^{(k+1)} = \left(\mathrm{diag}(\mathbf{q}^{(k)}) + \lambda\mathbf{I}\right)^{-1}
+\!\left((\mathbf{W}^{(k)} \odot \tilde{\mathbf{A}})\mathbf{F}^{(k)} + \lambda\mathbf{F}^{(0)}\right)
+\label{eq:qn_irls}
+\end{equation}
+
+where:
+\begin{itemize}
+  \item $\tilde{\mathbf{A}}$ is the symmetrically normalized adjacency matrix:
+  $\tilde{A}_{ij} = A_{ij}/\sqrt{d_i d_j}$.
+  \item $W^{(k)}_{ij} = \max\!\left(0,\; \frac{1}{2y^{(k)}_{ij}} - \frac{1}{2\gamma}\right)$
+  is the MCP-derived weight for edge $(i,j)$ at iteration $k$. Here
+  $y^{(k)}_{ij}$ is the current feature difference on that edge.
+  \item $q^{(k)}_m = \sum_j W^{(k)}_{mj} A_{mj}/d_m$ is a normalizing quantity.
+  \item $\mathbf{I}$ is the identity matrix.
+  \item $\odot$ denotes element-wise multiplication.
+\end{itemize}
+
+This update is one propagation layer. Stacking $K$ layers of this update gives
+the full RUNG model.
+
+\subsection{RUNG's Architecture in Practice}
+
+In code, RUNG runs as follows:
+\begin{enumerate}
+  \item Input features $\mathbf{X}$ are passed through an MLP (a small
+  neural network) to produce initial logits $\mathbf{F}^{(0)}$.
+  \item The graph $\mathbf{A}$ is preprocessed: self-loops are added, degrees
+  are computed, and the normalized adjacency $\tilde{\mathbf{A}}$ is formed.
+  \item The QN-IRLS update in Eq.~\ref{eq:qn_irls} is applied $K$ times
+  (default $K=10$).
+  \item The output $\mathbf{F}^{(K)}$ gives the final node predictions.
+\end{enumerate}
+
+The MLP parameters and any learnable parameters are trained with standard
+cross-entropy loss and the Adam optimizer.
+
+\subsection{RUNG's Time Complexity}
+
+RUNG has time complexity $O(K(m+n)d)$, where:
+\begin{itemize}
+  \item $K$ = number of propagation layers,
+  \item $m$ = number of edges in the graph,
+  \item $n$ = number of nodes,
+  \item $d$ = feature dimension.
+\end{itemize}
+
+This is the same order as a standard GCN. The reason is that computing the
+edge weights $W_{ij}$ requires only looking at the two endpoints of each edge,
+so the total cost over all edges is $O(md)$. The graph aggregation step
+(matrix multiply) is also $O(md)$. The diagonal inverse $(diag(\mathbf{q}) +
+\lambda\mathbf{I})^{-1}$ is $O(n)$ because it is a diagonal matrix. The total
+cost per layer is $O(md)$ dominating, so the full model is $O(Kmd)$ which
+simplifies to $O(K(m+n)d)$.
+
+\subsection{RUNG's Real Weakness}
+
+RUNG is genuinely strong, especially under large adaptive attack budgets.
+However, two weaknesses exist.
+
+First, $\gamma$ is a fixed hyperparameter chosen once before training. Every
+layer uses the same $\gamma$. This is a problem because in deeper layers, node
+features become smoother due to repeated aggregation. Pairwise feature
+differences $y_{ij}$ become smaller in deeper layers. If $\gamma$ was tuned
+for early layers where differences are large, it will be too large for later
+layers and many fake edges will not get pruned. If tuned for later layers, it
+will be too aggressive in early layers and remove valid edges. There is no
+single fixed $\gamma$ that is correct for all layers.
+
+Second, RUNG measures feature difference with Euclidean distance. An attacker
+who knows this can craft fake edges connecting nodes whose features are close in
+magnitude even if they are structurally dissimilar. Euclidean distance treats
+all dimensions equally and is sensitive to magnitude, so this is possible.
+Additionally, in high-dimensional feature spaces ($d$ is large), Euclidean
+distance suffers from the \emph{curse of dimensionality}: as dimensions
+increase, distances between random points cluster near the same value, making
+it hard to distinguish close from far. This means the MCP threshold $\gamma$
+becomes harder to set meaningfully.
+
+A third issue, noted in the original paper itself, is that RUNG was primarily
+evaluated on homophilic graphs (Cora, Citeseer). In heterophilic graphs, nodes
+from different classes are often connected. This is not because of an attack;
+it is genuine structure. RUNG's pruning logic treats large feature differences
+as evidence of attack. In heterophilic graphs, large differences can be
+legitimate, so RUNG prunes valid edges and hurts its own accuracy.
+
+%%------------------------------------------------------------------------
+\section{Our Methods: What We Built and Why}
+%%------------------------------------------------------------------------
+
+Both of our methods operate inside the RUGE model (Eq.~\ref{eq:ruge}).
+They change how the edge weight $W^{(k)}_{ij}$ is computed at each layer.
+The rest of the RUNG architecture (MLP, QN-IRLS update rule, training loop)
+stays unchanged. All complexity changes therefore apply within the RUGE
+computation block.
 
 \subsection{Method 1: Percentile Gamma}
-Our first target was changing gamma in the RUGE estimator. In original RUNG, gamma is selected early and kept fixed across layers. The issue is that with deeper GNN layers, node features become smoother and pairwise differences become smaller, a standard oversmoothing behavior \cite{li2018deeper}. If gamma stays fixed, deeper layers can treat too many edges as valid.
 
-To fix this, we implemented Percentile Gamma. Gamma is adapted per layer using a percentile-based threshold over edge differences. As differences shrink, gamma also shrinks. Attack edges usually connect dissimilar nodes, so they appear in the high-difference tail. We prune edges above a selected \(q\)-percentile rule. We can choose aggressive pruning (e.g., 50\%), moderate (75\%), or conservative (95\%). In this report, we use \(q=0.75\) as the normal setting.
+\textbf{Intuition.} RUNG uses a fixed $\gamma$ for every layer. The problem is
+that $\gamma$ controls the cutoff point for edge weights. An edge gets weight
+zero when its feature difference $y_{ij} \ge \gamma$. But as layers
+progress, all $y_{ij}$ values shrink because features smooth out. A $\gamma$
+that was correct for layer 1 becomes too large for layer 5: at layer 5, almost
+no edges satisfy $y_{ij} \ge \gamma$, so nothing gets pruned. The defense
+switches off in deeper layers exactly when an attacker who understands this can
+profit from it.
 
-\subsection{Method 2: Parametric Gamma}
-Second, we implemented Parametric Gamma. Percentile Gamma estimates threshold from current layer statistics. Parametric Gamma instead enforces a predictable decay curve with depth. We set a starting threshold \(\gamma_0\) and a decay multiplier \(r\), then apply:
+\textbf{Solution.} Instead of a fixed $\gamma$, we compute $\gamma$ at each
+layer from the actual distribution of edge distances at that layer. Specifically,
+we take the $q$-th percentile of all edge distances over edges that exist in
+the graph. This means $\gamma$ automatically tracks the current scale of feature
+differences. As features smooth out and all distances shrink, $\gamma$ also
+shrinks, and the cutoff stays relative to the current distribution.
+
+The computation is:
+\begin{equation}
+\gamma_k = \mathrm{quantile}\bigl(\{y^{(k)}_{ij} : (i,j) \in \mathcal{E},\; i \ne j\},\; q\bigr)
+\label{eq:percentile_gamma}
+\end{equation}
+
+We use $q = 0.75$ as the default. This means the top 25\% of edges by feature
+difference are candidates for zero weighting at each layer. Attack edges tend
+to connect dissimilar nodes, so they appear in the high-difference tail of the
+distribution. The percentile rule targets this tail adaptively at every layer.
+
+\textbf{Why this helps.} When the attack budget changes, the distribution of
+$y_{ij}$ values changes too. A high-budget attack adds more fake edges with
+large differences, pushing the 75th percentile up. The threshold $\gamma$
+follows. This means our defense automatically becomes stricter when the attack
+is stronger, and relaxes when the attack is weaker. Fixed $\gamma$ cannot do
+this.
+
+\textbf{Implementation.} This is implemented in \texttt{model/rung\_percentile\_gamma.py}.
+At each propagation step $k$, before computing weights, we compute
+$\gamma_k$ from Eq.~\ref{eq:percentile_gamma} using \texttt{torch.quantile}.
+The SCAD penalty (a penalty closely related to MCP) is then applied with this
+adaptive threshold. Training uses a single Adam optimizer group because $\gamma$
+is not a learnable parameter; it is computed from data.
+
+\textbf{Time complexity.} Computing the quantile over $m$ edge distances costs
+$O(m \log m)$ at each of $K$ layers. However, $m \log m$ is dominated by $md$
+for any reasonable feature dimension $d \ge 2$ (which is always true in
+practice; $d$ is at least 64 in our experiments). Therefore the overall
+complexity remains $O(K(m+n)d)$, exactly the same as the original RUNG. There
+is no asymptotic slowdown.
+
+\subsection{Method 2: Learnable Cosine Distance}
+
+\textbf{Intuition.} RUNG uses Euclidean distance to measure how different two
+nodes are:
 \[
-\gamma_k = \gamma_0\,r^k.
+y^{(k)}_{ij} = \left\lVert \frac{\mathbf{f}^{(k)}_i}{\sqrt{d_i}} - \frac{\mathbf{f}^{(k)}_j}{\sqrt{d_j}} \right\rVert_2
 \]
+This distance depends heavily on magnitude. Two nodes with large but similar
+feature vectors will have a small Euclidean distance. An attacker who knows
+RUNG uses Euclidean distance can add a fake edge between two nodes that are
+close in magnitude but structurally different. That fake edge will not be
+pruned because its distance $y_{ij}$ is small.
 
-Example with \(\gamma_0=5.0\) and \(r=0.8\): layer 0 is 5.0, layer 1 is 4.0, layer 2 is 3.2, layer 3 is 2.56. This smooth decay follows the same trend as feature smoothing, so the defense remains active at deeper layers where fixed thresholds fail \cite{li2018deeper}.
+Furthermore, the Euclidean distance computation is wrapped in a
+\texttt{.detach()} call in RUNG's code. This disconnects the distance from the
+gradient computation. The neural network cannot adjust its features to make
+the distance measure more discriminative during training. The network is
+passive: it computes features and then applies a fixed Euclidean rule that it
+cannot learn to improve.
 
-\subsection{Method 3: Learnable Cosine Distance}
-Third, we implemented a learnable defense in RUNG by changing the edge suspiciousness metric. Core RUNG relies on Euclidean distance, which depends strongly on magnitude. Under Adaptive Attack, a malicious node can be crafted to mimic magnitude and reduce Euclidean gap, so poisoned edges can pass through.
+\textbf{What we changed.} We replace the Euclidean distance with cosine
+similarity-based distance:
+\begin{equation}
+y^{(k)}_{ij} = 1 - \frac{\mathbf{f}^{(k)}_i \cdot \mathbf{f}^{(k)}_j}
+{\lVert \mathbf{f}^{(k)}_i \rVert_2 \cdot \lVert \mathbf{f}^{(k)}_j \rVert_2}
+\label{eq:cosine_dist}
+\end{equation}
 
-We moved to cosine-based distance and made it learnable through a trainable projection matrix before cosine computation. In simple terms, the model learns a custom feature space and then compares directional similarity there. This helps separate useful structural signals from noisy features. The idea is aligned with graph structure learning directions in robust GNN literature \cite{jin2020prognn}.
+Cosine distance measures the \emph{angle} between two vectors, not their
+length. When $y_{ij} = 0$, the two vectors point in exactly the same direction.
+When $y_{ij} = 1$, they are orthogonal. When $y_{ij} = 2$, they point in
+opposite directions.
 
-\subsection{Combined Model Design}
-After testing each method separately, we combined them to test unified improvement. The combination is not a direct conflict between Percentile Gamma and Parametric Gamma. We do not apply parametric decay directly to raw distance threshold. Instead, we apply parametric decay to the percentile level \(q\).
+\textbf{Why direction over magnitude?} An attacker trying to minimize cosine
+distance between two nodes must make them point in the same direction. In
+high-dimensional spaces, aligning the direction of two fundamentally different
+nodes (from different classes) is much harder than simply adjusting their
+magnitudes to be similar. Magnitude can be scaled by multiplying by a scalar.
+Direction cannot be changed so easily without changing the underlying feature
+content.
 
-In pure Percentile Gamma, \(q\) is fixed for all layers. In the combined design, \(q\) decays with depth, so pruning gets stricter in deeper layers. Parametric Gamma controls aggressiveness over depth, while Percentile Gamma controls how many high-difference edges are pruned per layer.
+In heterophilic graphs, two connected nodes from different classes have
+different feature content. Their Euclidean distance may be small if they happen
+to have similar magnitudes, but their cosine distance will be larger because
+their features point in different directions. Cosine distance is therefore more
+meaningful in heterophilic settings.
 
-Learnable Cosine Distance complements this by measuring angle-based feature inconsistency rather than magnitude-only mismatch. That made the model more robust under higher-budget attacks in several settings.
+\textbf{Allowing gradient flow.} In the original RUNG, the distance is
+detached from the computation graph. We remove this detach for the cosine
+distance computation when the distance module has learnable parameters. This
+allows gradients to flow through the distance computation during backpropagation.
+The network can then adjust the feature space to make the distance measure more
+discriminative. In other words, the network actively learns to project nodes
+into a geometric subspace where legitimate edges are close and fake edges are
+far, as measured by angle.
 
-Two design choices explain why we used this exact combination:
+This is a meaningful change because previously the defense was entirely
+hand-designed (Euclidean distance). Now the defense partially learns from data:
+it learns where to place things in feature space so that the cosine angle
+between connected nodes signals whether the connection is real or fake.
+
+\textbf{Implementation.} This is implemented in \texttt{model/rung\_learnable\_distance.py}.
+The distance module supports cosine, projection, and bilinear modes. In this
+report we use the cosine mode (no additional learnable parameters). The
+threshold $\gamma$ is still computed per-layer from percentiles (inheriting
+Method 1). Training uses one or two Adam optimizer groups depending on whether
+the distance module has learnable parameters. In the cosine mode (no learnable
+parameters), one group is used, same as base RUNG.
+
+\textbf{Time complexity.} Cosine similarity between two vectors of dimension
+$d$ costs $O(d)$: one dot product and two norm computations. This is the same
+cost as Euclidean squared distance. Computing cosine distance over all $m$
+edges costs $O(md)$. The rest of the propagation step is unchanged. Therefore
+the total complexity is $O(K(m+n)d)$, exactly the same as the original RUNG.
+
+Moreover, cosine distance may in practice be \emph{faster} than Euclidean
+distance. The Euclidean computation in RUNG uses \texttt{pairwise\_squared\_euclidean}
+which expands to $O(n^2 d)$ via matrix operations to handle all node pairs.
+Our cosine computation operates only over existing edges (there are $m$ of
+them), so its practical cost is $O(md)$. In sparse graphs (where $m \ll n^2$,
+which is the case for all real-world graphs we test), $O(md)$ is much faster
+than $O(n^2 d)$. This is a concrete practical speedup on top of the same
+asymptotic complexity class.
+
+%%------------------------------------------------------------------------
+\section{Experiments}
+%%------------------------------------------------------------------------
+
+\subsection{Datasets}
+
+We evaluate on six datasets:
 \begin{itemize}
-\item We did not use only Parametric Gamma + Learnable Distance because learnable distance changes scale during training, while a rigid parametric threshold can become mismatched.
-\item We did not use only Percentile Gamma + Learnable Distance with flat \(q\), because this ignores depth-wise oversmoothing and can under-prune or over-prune depending on layer depth.
+  \item \textbf{Homophilic:} Cora, Citeseer, Pubmed. In these graphs, connected
+  nodes tend to be from the same class. GNNs generally work well here.
+  \item \textbf{Heterophilic:} Chameleon, Wisconsin, Cornell. In these graphs,
+  connected nodes are often from \emph{different} classes. Standard GNNs
+  struggle here, and robust GNNs that rely on feature similarity as a signal
+  for legitimacy can also fail.
 \end{itemize}
 
-\section{Results and Discussion}
-\subsection{Percentile Gamma Results}
-For Cora and Citeseer with \(q=0.75\), Percentile Gamma shows improved robustness over base RUNG when attack budget increases.
+\subsection{Attack Setting}
+
+We use PGD adaptive attack~\cite{xu2019pgd} as the threat model. The attacker
+knows the model, its parameters, and the dataset. The attacker can add or
+delete edges, but cannot modify node features directly. The attack budget ranges
+from 0\% (no attack, clean accuracy) to 100\% (as many edge changes as there
+are original edges in the graph).
+
+We used the same adaptive attack code from the original RUNG paper. This means
+our attack is the same attacker that RUNG was designed to defend against.
+
+\subsection{Models Compared}
+
+We compare three models:
+\begin{itemize}
+  \item \textbf{RUNG (MCP, $\gamma=6$)}: The original baseline from~\cite{hou2024rung}.
+  \item \textbf{RUNG\_percentile\_gamma ($q=0.75$)}: Our adaptive threshold method.
+  \item \textbf{RUNG\_learnable\_distance (cosine, $q=0.75$)}: Our cosine distance method
+  with percentile-based threshold.
+\end{itemize}
+
+\subsection{Results}
+
+Figures~\ref{fig:cora}--\ref{fig:cornell} show the robustness curves on all six
+datasets. Each plot shows accuracy on the $y$-axis and attack budget on the
+$x$-axis. Shaded bands show variance across runs.
 
 \begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Cora_RUNG_vs_RUNG_percentile_gamma..jpg}
-	\caption{Cora: RUNG vs Percentile Gamma.}
-	\Description{Comparison plot on Cora between baseline RUNG and Percentile Gamma method.}
-	\label{fig:cora_percentile}
+  \centering
+  \includegraphics[width=\linewidth]{figures/robustness_cora_compare.png}
+  \caption{Cora: robustness under adaptive PGD attack. All three models at
+  0\% attack are around 78--81\%. At 100\% budget, RUNG drops to 53\%,
+  percentile gamma to 62\%, and cosine distance holds at 75\%.}
+  \Description{Robustness comparison on Cora dataset.}
+  \label{fig:cora}
 \end{figure}
 
 \begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Citeseer_RUNG_vs_RUNG_percentile_gamma.jpg}
-	\caption{Citeseer: RUNG vs Percentile Gamma.}
-	\Description{Comparison plot on Citeseer between baseline RUNG and Percentile Gamma method.}
-	\label{fig:citeseer_percentile}
+  \centering
+  \includegraphics[width=\linewidth]{figures/robustness_citeseer_compare.png}
+  \caption{Citeseer: robustness under adaptive PGD attack. RUNG drops to 48\%
+  at 100\% budget. Percentile gamma holds around 57\%. Cosine distance holds
+  around 64\%.}
+  \Description{Robustness comparison on Citeseer dataset.}
+  \label{fig:citeseer}
 \end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/robustness_pubmed_compare.png}
+  \caption{Pubmed: all three models are relatively close here. RUNG drops
+  from 68\% to 57\%. Percentile gamma and cosine distance both hold around
+  68--71\% across all budgets, showing much flatter degradation.}
+  \Description{Robustness comparison on Pubmed dataset.}
+  \label{fig:pubmed}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/robustness_chameleon_compare.png}
+  \caption{Chameleon: this is a heterophilic dataset. RUNG collapses from
+  40\% to 14\% at 100\% budget. Cosine distance stays around 40\%.
+  Percentile gamma holds around 32\%.}
+  \Description{Robustness comparison on Chameleon dataset.}
+  \label{fig:chameleon}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/robustness_wisconsin_compare.png}
+  \caption{Wisconsin: another heterophilic dataset. RUNG starts at 53\% and
+  falls to 34\%. Cosine distance starts at 59\% and \emph{rises} slightly to
+  61\% under attack, a striking result. Percentile gamma stays around 50\%.}
+  \Description{Robustness comparison on Wisconsin dataset.}
+  \label{fig:wisconsin}
+\end{figure}
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/robustness_cornell_compare.png}
+  \caption{Cornell: heterophilic dataset. RUNG starts at 45\% and falls to
+  30\%. Percentile gamma is stable around 42\%. Cosine distance starts at 50\%
+  and stays near 48\% even at full budget.}
+  \Description{Robustness comparison on Cornell dataset.}
+  \label{fig:cornell}
+\end{figure}
+
 \FloatBarrier
 
-\subsection{Parametric Gamma Results}
-On Cora and Citeseer, Parametric Gamma also improves performance over RUNG as attack budget grows. We still observe high variance in some settings, so this method needs more tuning.
+\subsection{Why Cosine Distance Helps on Heterophilic Graphs}
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Cora_RUNG_vs_RUNG_parametric_gamma.jpg}
-	\caption{Cora: RUNG vs Parametric Gamma.}
-	\Description{Comparison plot on Cora between baseline RUNG and Parametric Gamma method.}
-	\label{fig:cora_parametric}
-\end{figure}
+The heterophilic results are the most interesting and most different from what
+RUNG can do. In Chameleon, RUNG drops 26 percentage points from clean to full
+attack. Our cosine distance model drops only about 4 percentage points. In
+Wisconsin, RUNG drops 19 points, cosine distance effectively does not drop
+at all. In Cornell, RUNG drops 15 points, cosine distance drops about 2 points.
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Citeseer_RUNG_vs_RUNG_parametric_gamma.jpg}
-	\caption{Citeseer: RUNG vs Parametric Gamma.}
-	\Description{Comparison plot on Citeseer between baseline RUNG and Parametric Gamma method.}
-	\label{fig:citeseer_parametric}
-\end{figure}
-\FloatBarrier
+The reason is the following. RUNG's MCP penalty assigns low weight to edges
+where the feature difference $y_{ij}$ is large. In a heterophilic graph, valid
+edges connect nodes from different classes. Their features are legitimately
+different. So RUNG prunes valid edges. This makes the GNN less able to use
+the graph structure, hurting clean accuracy. Under attack, additional fake edges
+with large differences are also pruned, but so are too many real ones. RUNG
+basically disables itself in heterophilic settings.
 
-\subsection{Learnable Cosine Distance Results}
-Learnable Cosine Distance gives good improvements in several runs. It performs especially well on heterophilic settings where angle-based similarity can preserve useful cross-class structure better than magnitude-based Euclidean distance.
+Cosine distance measures \emph{direction}, not magnitude. In a heterophilic
+graph, two nodes from different classes can have features that point in
+different directions. But importantly, legitimate connections in heterophilic
+graphs are structured: the network can learn which angular relationships
+correspond to real connections. Because the gradient can flow through the cosine
+computation (unlike in RUNG where the distance is detached), the network can
+adjust the feature space to make genuine connections appear angularly close and
+fake connections appear angularly far. This is a meaningful learning signal that
+Euclidean distance with gradient detachment cannot provide.
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Cora_RUNG_vs_RUNG_learnable_distance.jpg}
-	\caption{Cora: RUNG vs Learnable Cosine Distance.}
-	\Description{Comparison plot on Cora between baseline RUNG and Learnable Cosine Distance method.}
-	\label{fig:cora_learnable}
-\end{figure}
+%%------------------------------------------------------------------------
+\section{Is This State of the Art?}
+%%------------------------------------------------------------------------
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Citeseer_RUNG_vs_RUNG_learnable_distance.jpg}
-	\caption{Citeseer: RUNG vs Learnable Cosine Distance.}
-	\Description{Comparison plot on Citeseer between baseline RUNG and Learnable Cosine Distance method.}
-	\label{fig:citeseer_learnable}
-\end{figure}
-\FloatBarrier
+We are honest about this: we do not know for certain whether our method
+is state of the art in any absolute sense. Here is what we can say.
 
-\subsection{Combined Model Results}
-The combined model was built to test whether the methods strengthen each other under stronger attacks. For homophilic datasets, the combined setup performs very well at higher attack budgets.
+The original RUNG paper was published at NeurIPS 2024 and outperformed all
+prior robust GNN baselines it was compared with, including SoftMedian, TWIRLS,
+ElasticGNN, GARNET, and others. After RUNG's publication, follow-on work has
+not, to our knowledge, produced widely replicated improvements that specifically
+build on the RUNG framework. Most post-RUNG work in robust GNNs has focused on
+different directions: certifiable robustness, spectral defenses, and
+heterophily-specific architectures.
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Cora_RUNG_vs_RUNG_combined.jpg}
-	\caption{Cora: RUNG vs Combined Model.}
-	\Description{Comparison plot on Cora between baseline RUNG and combined method.}
-	\label{fig:cora_combined}
-\end{figure}
+What we can say honestly is this: baseline RUNG fails on heterophilic graphs
+under high attack budgets. It drops to 14\% on Chameleon and 30\% on Cornell at
+100\% attack budget. Our cosine distance model maintains 40\% on Chameleon and
+48\% on Cornell at the same budget. These are not small margins. On homophilic
+datasets like Cora, we also improve: RUNG reaches 53\% at 100\% budget, our
+cosine model reaches 75\%. These are meaningful empirical improvements over the
+RUNG baseline.
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Citeseer_RUNG_vs_RUNG_combined.jpg}
-	\caption{Citeseer: RUNG vs Combined Model.}
-	\Description{Comparison plot on Citeseer between baseline RUNG and combined method.}
-	\label{fig:citeseer_combined}
-\end{figure}
+We are not comparing against other published methods beyond RUNG because we do
+not have access to their implementations in our codebase. The fair claim is:
+our methods outperform RUNG under the same attack conditions, on both homophilic
+and heterophilic datasets. Whether they outperform all prior work in the field
+is a question that requires a broader benchmark study that is beyond our current
+scope.
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Pubmed_RUNG_vs_RUNG_combined.jpg}
-	\caption{Pubmed: RUNG vs Combined Model.}
-	\Description{Comparison plot on Pubmed between baseline RUNG and combined method.}
-	\label{fig:pubmed_combined}
-\end{figure}
-\FloatBarrier
+%%------------------------------------------------------------------------
+\section{Limitations: What We Did Not Do}
+%%------------------------------------------------------------------------
 
-For heterophilic datasets, we observed a different behavior. Learnable Distance can outperform combined thresholding variants in some cases. The combined model is often still better than original RUNG, but not always better than the best independent method. A key reason is over-pruning in heterophilic graphs: valid edges can naturally connect dissimilar nodes.
+\subsection{The Attack We Used}
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Chameleon_RUNG_vs_RUNG_combined.jpg}
-	\caption{Chameleon: RUNG vs Combined Model.}
-	\Description{Comparison plot on Chameleon between baseline RUNG and combined method.}
-	\label{fig:chameleon_combined}
-\end{figure}
+The adaptive attack we used is the PGD edge attack from the original RUNG
+codebase. This attack can add or delete edges. It cannot modify node features.
+This is a realistic threat model for certain scenarios: for example, in a
+citation network, an attacker can submit papers with fake citations (adding
+edges) or remove citations (deleting edges), but cannot change the text content
+of existing papers.
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Wisconsin_RUNG_vs_RUNG_combined.jpg}
-	\caption{Wisconsin: RUNG vs Combined Model.}
-	\Description{Comparison plot on Wisconsin between baseline RUNG and combined method.}
-	\label{fig:wisconsin_combined}
-\end{figure}
+However, this means our attack is not fully adaptive to the cosine distance
+model. A truly adaptive attacker who knows we are using cosine distance would
+not only add and delete edges. They would also try to craft feature vectors
+that minimize cosine distance between dissimilar nodes, making their fake edges
+look legitimate. Our current attack does not do this.
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Cornell_RUNG_vs_RUNG_combined.jpg}
-	\caption{Cornell: RUNG vs Combined Model.}
-	\Description{Comparison plot on Cornell between baseline RUNG and combined method.}
-	\label{fig:cornell_combined}
-\end{figure}
+This is an important limitation. It means our robustness results may be
+somewhat optimistic for the learnable cosine distance model. The model has not
+been tested against an attacker who specifically tries to fool the cosine
+metric by modifying features or injecting entirely new nodes.
 
-\subsection{Heterophilic Graph Analysis}
-The paper itself already indicates that RUNG is mainly designed for homophilic graphs. That is why we included Chameleon, Wisconsin, and Cornell \cite{pei2020geomgcn}. In our tests, baseline RUNG performs weakly in these settings. Learnable Cosine Distance often performs better, likely because Euclidean distance fails when valid neighbors are far in magnitude but still structurally meaningful.
+To be fully rigorous, we should design a combined attack that simultaneously
+perturbs edges and feature vectors (and possibly injects fake nodes with
+crafted features), subject to a joint budget. This is the correct threat model
+for testing whether cosine distance is truly robust against an adaptive
+adversary who knows the defense.
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/Cornell_All.jpg}
-	\caption{Cornell: All methods comparison.}
-	\Description{Full comparison plot for Cornell including multiple methods in one figure.}
-	\label{fig:cornell_all}
-\end{figure}
+\subsection{Scale}
 
-\begin{figure}[!htbp]
-	\centering
-	\includegraphics[width=\linewidth]{figures/WIsconsin_All.jpg}
-	\caption{Wisconsin: All methods comparison.}
-	\Description{Full comparison plot for Wisconsin including multiple methods in one figure.}
-	\label{fig:wisconsin_all}
-\end{figure}
-\FloatBarrier
+We tested on six datasets, all of moderate size. The original RUNG paper also
+tested on Ogbn-Arxiv, a large-scale dataset with over one million edges. We did
+not test on Ogbn-Arxiv because it requires significant compute time. It is
+possible that our methods scale differently to very large graphs.
 
-The core issue we observed is a double-correction effect in heterophilic graphs. Learnable Distance tries to balance directional structure, but depth-wise parametric strictness can increase pruning too quickly. This can choke message passing and remove valid heterophilic edges. This explains why independent methods can beat the combined model in heterophilic space.
+\subsection{Theoretical Guarantees}
 
-From this progress stage, our scientific claim is the following:
+We do not have formal theoretical guarantees for why cosine distance provides
+better robustness. The original RUNG paper provides convergence guarantees for
+QN-IRLS and an unbiasedness analysis for MCP. We do not have equivalent
+theoretical statements for the adaptive percentile threshold or for cosine
+distance. The results are empirically demonstrated but not theoretically
+proven.
 
-\textit{Our experiments reveal that while a combined approach is highly effective for homophilic graphs, heterophilic graphs suffer from over-regularization when dynamic thresholding (Percentile/Parametric) is combined with dynamic metrics (Learnable Distance). For heterophilic environments, upgrading the distance metric to Cosine Learnable Distance independently yields the most optimal robustness, as it prevents the accidental over-pruning of valid heterophilic edges.}
+%%------------------------------------------------------------------------
+\section{Future Work}
+%%------------------------------------------------------------------------
 
+There are three clear next steps.
+
+\textbf{Feature-aware adaptive attack.} The most important missing piece is
+an attack algorithm that also modifies feature vectors. A real adaptive
+adversary who knows we are using cosine distance will craft features to reduce
+cosine distance between fake edges. We need to implement a joint edge-and-feature
+attack. This would also test injection of fake nodes with crafted features. Only
+with this attack can we claim our defense is fully tested against cosine-aware
+adversaries.
+
+\textbf{Technical guarantees for cosine distance.} We would like to prove
+whether MCP applied to cosine distance produces an unbiased estimator in the
+same sense as MCP applied to Euclidean distance in the original RUNG paper. This
+requires analyzing the bias of $\ell_1$-style penalties when applied to cosine
+distances instead of Euclidean distances. It is a non-trivial but tractable
+theoretical problem.
+
+\textbf{Large-scale evaluation.} We need to test our models on Ogbn-Arxiv and
+similar large graph benchmarks to verify that the robustness gains we see on
+smaller datasets hold at scale. It is possible that cosine distance has
+different characteristics in very large, very sparse graphs. Testing on large
+datasets is necessary before making strong claims about general applicability.
+
+%%------------------------------------------------------------------------
 \section{Conclusion}
-This progress report shows that our three modifications improve robustness over base RUNG in many attack settings. Percentile Gamma and Parametric Gamma address depth-wise threshold mismatch caused by oversmoothing. Learnable Cosine Distance improves robustness by changing edge suspiciousness measurement from magnitude-driven Euclidean comparison to direction-aware similarity.
+%%------------------------------------------------------------------------
 
-The combined model performs strongly on homophilic datasets, especially under high attack budget. For heterophilic datasets, we observed that independent Learnable Cosine Distance can outperform the combined setup because strict dynamic pruning can remove valid edges.
+We built two improvements over the original RUNG model, both operating inside
+the RUGE estimation framework. The Percentile Gamma method replaces the fixed
+MCP threshold with a per-layer threshold derived from the actual distribution
+of edge distances. This makes the defense adaptive to changes in the attack
+budget and to feature smoothing in deeper layers. The Learnable Cosine Distance
+method replaces Euclidean distance with cosine distance and allows gradient to
+flow through the distance computation so the network can learn a geometric
+subspace that separates real connections from fake ones.
 
-For future work toward the final project presentation, we plan to:
-\begin{itemize}
-\item complete broader training and testing for each method independently and in combination,
-\item increase attack budget analysis beyond current levels up to 100\%,
-\item build stronger variance analysis plots for all datasets,
-\item and develop clearer theoretical guarantees for why each method behaves this way.
-\end{itemize}
+Both methods have exactly the same asymptotic time complexity as the original
+RUNG: $O(K(m+n)d)$. The cosine distance implementation is likely faster in
+practice on sparse graphs because it avoids the $O(n^2 d)$ pairwise computation
+in the original RUNG code.
 
-The theoretical part is still hard for us because the base paper is complex and these topics are new to us, but this is the key target before final presentation.
+The experimental results are clear: both methods improve over RUNG, and the
+cosine distance model is the stronger of the two. The most striking improvements
+are on heterophilic graphs where RUNG fails badly. On Chameleon at 100\% attack
+budget, RUNG reaches 14\% accuracy; our cosine model reaches 40\%. On Wisconsin,
+RUNG falls to 34\% while our cosine model stays above 60\%. These are not
+marginal improvements; they represent a qualitative difference in behavior.
+
+The main limitation of our current work is that we tested against an attack
+that does not modify feature vectors. A fully adaptive adversary who knows we
+are using cosine distance should also attack the feature space. This is the
+most important open problem for this project.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}

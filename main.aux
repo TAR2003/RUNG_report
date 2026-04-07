@@ -2,75 +2,65 @@
 \providecommand\hyper@newdestlabel[2]{}
 \providecommand\HyField@AuxAddToFields[1]{}
 \providecommand\HyField@AuxAddToCoFields[2]{}
-\citation{hou2024rung}
-\citation{fan2001}
-\citation{hou2024rung}
-\citation{fan2001}
-\citation{pei2020geomgcn}
+\citation{xu2019pgd}
 \citation{hou2024rung}
 \@writefile{toc}{\contentsline {section}{Abstract}{1}{section*.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
-\newlabel{eq:ruge_obj}{{1}{1}{Introduction}{equation.1.1}{}}
-\newlabel{eq:mcp_penalty}{{2}{1}{Introduction}{equation.1.2}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {2}Materials and Methods}{1}{section.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Datasets}{1}{subsection.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Base Architecture and Training Context}{1}{subsection.2.2}\protected@file@percent }
-\citation{li2018deeper}
-\citation{li2018deeper}
-\citation{jin2020prognn}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Method 1: Percentile Gamma}{2}{subsection.2.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Method 2: Parametric Gamma}{2}{subsection.2.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}Method 3: Learnable Cosine Distance}{2}{subsection.2.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.6}Combined Model Design}{2}{subsection.2.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3}Results and Discussion}{2}{section.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Percentile Gamma Results}{2}{subsection.3.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Cora: RUNG vs Percentile Gamma.}}{2}{figure.caption.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction and Background}{1}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}What Are Graph Neural Networks?}{1}{subsection.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}What Are Adversarial Attacks on GNNs?}{1}{subsection.1.2}\protected@file@percent }
+\citation{zhang2010mcp}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3}What Is RUNG and What Does It Do?}{2}{subsection.1.3}\protected@file@percent }
+\newlabel{eq:ruge}{{1}{2}{What Is RUNG and What Does It Do?}{equation.1}{}}
+\newlabel{eq:mcp}{{2}{2}{What Is RUNG and What Does It Do?}{equation.2}{}}
+\newlabel{eq:qn_irls}{{3}{2}{What Is RUNG and What Does It Do?}{equation.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.4}RUNG's Architecture in Practice}{2}{subsection.1.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.5}RUNG's Time Complexity}{2}{subsection.1.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.6}RUNG's Real Weakness}{2}{subsection.1.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}Our Methods: What We Built and Why}{3}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Method 1: Percentile Gamma}{3}{subsection.2.1}\protected@file@percent }
+\newlabel{eq:percentile_gamma}{{4}{3}{Method 1: Percentile Gamma}{equation.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Method 2: Learnable Cosine Distance}{3}{subsection.2.2}\protected@file@percent }
+\newlabel{eq:cosine_dist}{{5}{3}{Method 2: Learnable Cosine Distance}{equation.5}{}}
+\citation{xu2019pgd}
+\citation{hou2024rung}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Experiments}{4}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Datasets}{4}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Attack Setting}{4}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Models Compared}{4}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Results}{4}{subsection.3.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Cora: robustness under adaptive PGD attack. All three models at 0\% attack are around 78--81\%. At 100\% budget, RUNG drops to 53\%, percentile gamma to 62\%, and cosine distance holds at 75\%.}}{4}{figure.caption.5}\protected@file@percent }
 \providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
-\newlabel{fig:cora_percentile}{{1}{2}{Cora: RUNG vs Percentile Gamma}{figure.caption.5}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Citeseer: RUNG vs Percentile Gamma.}}{2}{figure.caption.6}\protected@file@percent }
-\newlabel{fig:citeseer_percentile}{{2}{2}{Citeseer: RUNG vs Percentile Gamma}{figure.caption.6}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Parametric Gamma Results}{2}{subsection.3.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Cora: RUNG vs Parametric Gamma.}}{3}{figure.caption.7}\protected@file@percent }
-\newlabel{fig:cora_parametric}{{3}{3}{Cora: RUNG vs Parametric Gamma}{figure.caption.7}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Citeseer: RUNG vs Parametric Gamma.}}{3}{figure.caption.8}\protected@file@percent }
-\newlabel{fig:citeseer_parametric}{{4}{3}{Citeseer: RUNG vs Parametric Gamma}{figure.caption.8}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Learnable Cosine Distance Results}{3}{subsection.3.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Cora: RUNG vs Learnable Cosine Distance.}}{3}{figure.caption.9}\protected@file@percent }
-\newlabel{fig:cora_learnable}{{5}{3}{Cora: RUNG vs Learnable Cosine Distance}{figure.caption.9}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Citeseer: RUNG vs Learnable Cosine Distance.}}{3}{figure.caption.10}\protected@file@percent }
-\newlabel{fig:citeseer_learnable}{{6}{3}{Citeseer: RUNG vs Learnable Cosine Distance}{figure.caption.10}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Combined Model Results}{3}{subsection.3.4}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces Cora: RUNG vs Combined Model.}}{3}{figure.caption.11}\protected@file@percent }
-\newlabel{fig:cora_combined}{{7}{3}{Cora: RUNG vs Combined Model}{figure.caption.11}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces Citeseer: RUNG vs Combined Model.}}{3}{figure.caption.12}\protected@file@percent }
-\newlabel{fig:citeseer_combined}{{8}{3}{Citeseer: RUNG vs Combined Model}{figure.caption.12}{}}
-\citation{pei2020geomgcn}
-\@writefile{lof}{\contentsline {figure}{\numberline {9}{\ignorespaces Pubmed: RUNG vs Combined Model.}}{4}{figure.caption.13}\protected@file@percent }
-\newlabel{fig:pubmed_combined}{{9}{4}{Pubmed: RUNG vs Combined Model}{figure.caption.13}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {10}{\ignorespaces Chameleon: RUNG vs Combined Model.}}{4}{figure.caption.14}\protected@file@percent }
-\newlabel{fig:chameleon_combined}{{10}{4}{Chameleon: RUNG vs Combined Model}{figure.caption.14}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Heterophilic Graph Analysis}{4}{subsection.3.5}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {11}{\ignorespaces Wisconsin: RUNG vs Combined Model.}}{4}{figure.caption.15}\protected@file@percent }
-\newlabel{fig:wisconsin_combined}{{11}{4}{Wisconsin: RUNG vs Combined Model}{figure.caption.15}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {12}{\ignorespaces Cornell: RUNG vs Combined Model.}}{4}{figure.caption.16}\protected@file@percent }
-\newlabel{fig:cornell_combined}{{12}{4}{Cornell: RUNG vs Combined Model}{figure.caption.16}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {13}{\ignorespaces Cornell: All methods comparison.}}{4}{figure.caption.17}\protected@file@percent }
-\newlabel{fig:cornell_all}{{13}{4}{Cornell: All methods comparison}{figure.caption.17}{}}
+\newlabel{fig:cora}{{1}{4}{Cora: robustness under adaptive PGD attack. All three models at 0\% attack are around 78--81\%. At 100\% budget, RUNG drops to 53\%, percentile gamma to 62\%, and cosine distance holds at 75\%}{figure.caption.5}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Citeseer: robustness under adaptive PGD attack. RUNG drops to 48\% at 100\% budget. Percentile gamma holds around 57\%. Cosine distance holds around 64\%.}}{4}{figure.caption.6}\protected@file@percent }
+\newlabel{fig:citeseer}{{2}{4}{Citeseer: robustness under adaptive PGD attack. RUNG drops to 48\% at 100\% budget. Percentile gamma holds around 57\%. Cosine distance holds around 64\%}{figure.caption.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Pubmed: all three models are relatively close here. RUNG drops from 68\% to 57\%. Percentile gamma and cosine distance both hold around 68--71\% across all budgets, showing much flatter degradation.}}{5}{figure.caption.7}\protected@file@percent }
+\newlabel{fig:pubmed}{{3}{5}{Pubmed: all three models are relatively close here. RUNG drops from 68\% to 57\%. Percentile gamma and cosine distance both hold around 68--71\% across all budgets, showing much flatter degradation}{figure.caption.7}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Chameleon: this is a heterophilic dataset. RUNG collapses from 40\% to 14\% at 100\% budget. Cosine distance stays around 40\%. Percentile gamma holds around 32\%.}}{5}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:chameleon}{{4}{5}{Chameleon: this is a heterophilic dataset. RUNG collapses from 40\% to 14\% at 100\% budget. Cosine distance stays around 40\%. Percentile gamma holds around 32\%}{figure.caption.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Wisconsin: another heterophilic dataset. RUNG starts at 53\% and falls to 34\%. Cosine distance starts at 59\% and \emph  {rises} slightly to 61\% under attack, a striking result. Percentile gamma stays around 50\%.}}{5}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:wisconsin}{{5}{5}{Wisconsin: another heterophilic dataset. RUNG starts at 53\% and falls to 34\%. Cosine distance starts at 59\% and \emph {rises} slightly to 61\% under attack, a striking result. Percentile gamma stays around 50\%}{figure.caption.9}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces Cornell: heterophilic dataset. RUNG starts at 45\% and falls to 30\%. Percentile gamma is stable around 42\%. Cosine distance starts at 50\% and stays near 48\% even at full budget.}}{5}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:cornell}{{6}{5}{Cornell: heterophilic dataset. RUNG starts at 45\% and falls to 30\%. Percentile gamma is stable around 42\%. Cosine distance starts at 50\% and stays near 48\% even at full budget}{figure.caption.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Why Cosine Distance Helps on Heterophilic Graphs}{5}{subsection.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Is This State of the Art?}{5}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Limitations: What We Did Not Do}{6}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}The Attack We Used}{6}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Scale}{6}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}Theoretical Guarantees}{6}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Future Work}{6}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{6}{section.7}\protected@file@percent }
 \bibstyle{ACM-Reference-Format}
 \bibdata{references}
-\bibcite{fan2001}{{1}{2001}{{Fan and Li}}{{}}}
-\bibcite{hou2024rung}{{2}{2024}{{Hou et~al\mbox  {.}}}{{}}}
-\bibcite{jin2020prognn}{{3}{2020}{{Jin et~al\mbox  {.}}}{{}}}
-\bibcite{li2018deeper}{{4}{2018}{{Li et~al\mbox  {.}}}{{}}}
-\bibcite{pei2020geomgcn}{{5}{2020}{{Pei et~al\mbox  {.}}}{{}}}
+\bibcite{hou2024rung}{{1}{2024}{{Hou et~al\mbox  {.}}}{{}}}
+\bibcite{xu2019pgd}{{2}{2019}{{Xu et~al\mbox  {.}}}{{}}}
+\bibcite{zhang2010mcp}{{3}{2010}{{Zhang}}{{}}}
 \newlabel{tocindent-1}{0pt}
 \newlabel{tocindent0}{0pt}
 \newlabel{tocindent1}{4.185pt}
 \newlabel{tocindent2}{10.34999pt}
 \newlabel{tocindent3}{0pt}
-\@writefile{lof}{\contentsline {figure}{\numberline {14}{\ignorespaces Wisconsin: All methods comparison.}}{5}{figure.caption.18}\protected@file@percent }
-\newlabel{fig:wisconsin_all}{{14}{5}{Wisconsin: All methods comparison}{figure.caption.18}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {4}Conclusion}{5}{section.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{References}{5}{section*.20}\protected@file@percent }
-\newlabel{TotPages}{{5}{5}{}{page.5}{}}
-\gdef \@abspage@last{5}
+\newlabel{tocindent4}{0pt}
+\newlabel{tocindent5}{0pt}
+\@writefile{toc}{\contentsline {section}{References}{7}{section*.12}\protected@file@percent }
+\newlabel{TotPages}{{7}{7}{}{page.7}{}}
+\gdef \@abspage@last{7}

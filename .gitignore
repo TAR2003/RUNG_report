@@ -1,0 +1,30 @@
+# Ignore LaTeX intermediate files generated during compilation
+*.aux
+*.bbl
+*.blg
+*.brf
+*.log
+*.out
+*.toc
+*.nav
+*.snm
+*.vrb
+*.fdb_latexmk
+*.fls
+*.synctex
+*.synctex.gz
+*.run.xml
+*.lof
+*.lot
+*.dvi
+*.xdv
+*.pdfsync
+*.ps
+
+# Ignore latexmk temporary output directory
+out/
+
+# Keep source and final published files
+!*.tex
+!*.bib
+!*.pdf
