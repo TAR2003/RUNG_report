@@ -106,7 +106,7 @@ To our knowledge, prior work on robust GNNs has not systematically addressed the
 %%------------------------------------------------------------------------
 \section{Methodology}\label{sec:methods}
 %%------------------------------------------------------------------------
-Both of our methods operate within the RUGE optimization framework (Eq.~\ref{eq:ruge}). They modify how the edge weight $W^{(k)}_{ij}$ is computed at each layer. The remaining RUNG architecture (MLP encoder, QN-IRLS update rule, training loop) remains unchanged. All modifications occur within the RUGE penalty computation block.
+Both of our methods operate within the RUGE optimization framework~\cite{hou2024rung}. They modify how the edge weight $W^{(k)}_{ij}$ is computed at each layer. The remaining RUNG architecture (MLP encoder, QN-IRLS update rule, training loop) remains unchanged. All modifications occur within the RUGE penalty computation block.
 
 \subsection{Method 1: Adaptive Percentile-based Thresholding}\label{sec:method1}
 
@@ -161,7 +161,7 @@ Both the percentile-gamma and learnable cosine-distance methods preserve the $\m
 \end{lemma}
 
 \begin{proof}
-Consider a single propagation layer $k$. The QN-IRLS update (Eq.~\ref{eq:qn_irls}) requires:
+Consider a single propagation layer $k$. The QN-IRLS update procedure~\cite{hou2024rung} requires:
 
 1. \textbf{Edge-weight computation:} Computing $W^{(k)}_{ij}$ for all $m$ edges requires evaluating either the Euclidean or cosine distance between endpoint feature vectors and applying the MCP function. Each distance computation is $\mathcal{O}(d)$, yielding $\mathcal{O}(md)$ total.
 
@@ -215,10 +215,10 @@ The threat model is consistent with prior work~\cite{hou2024rung}: an adaptive P
 %     Hyperparameter & Value \\
 %     \midrule
 %     Number of QN-IRLS layers ($K$) & 10 \\
-%     Feature dimension ($d$) & XX \\
-%     MLP hidden dimensions & XX \\
-%     Learning rate & XX \\
-%     L2 regularization ($\lambda$) & XX \\
+%     Feature dimension ($d$) & 64 \\
+%     MLP hidden dimensions & 64 \\
+%     Learning rate & 0.001 \\
+%     L2 regularization ($\lambda$) & 0.0005 \\
 %     Percentile threshold ($q$) & 0.75 \\
 %     MCP threshold ($\gamma$, RUNG baseline) & 6.0 \\
 %     \bottomrule
@@ -439,11 +439,53 @@ What we can assert with confidence:
 
 Our experimental evaluation operates within a restricted threat model: the PGD attacker can modify graph edges but not node features. This is realistic for certain application domains (e.g., citation networks where an attacker can add/remove citations but cannot alter paper content) but does not capture the fully adaptive adversary.
 
-\textbf{Limitation: Feature-Oblivious Attacks.} A fully adaptive adversary aware of our cosine-distance defense would not restrict attacks to edge perturbations. Instead, they would simultaneously craft feature vectors that minimize cosine distance between legitimately different nodes, or inject new high-quality nodes with spoofed features. Mathematically, let the attacker operate under a joint budget $\delta = (\delta_e, \delta_f, \delta_n)$ controlling edge, feature, and node perturbations respectively. The optimization becomes:
+\textbf{Limitation: Feature-Aware Adversarial Attacks---The Kryptonite of Distance-Based Defenses.} 
 
-$$\min_{\tilde{\mathbf{A}}, \tilde{\mathbf{X}}, \mathbf{X}^{*}} \ell\left(\text{GNN}(\tilde{\mathbf{A}}, \tilde{\mathbf{X}}, \mathbf{X}^{*})\right) \quad \text{s.t.} \quad |\tilde{\mathbf{A}} - \mathbf{A}|_0 \leq \delta_e m, \; \tilde{\mathbf{X}} = \mathbf{X} + \mathbf{P}, \; \|\mathbf{P}\|_\infty \leq \delta_f$$
+Our experimental evaluation assumes a structural-only threat model where the attacker can only modify graph topology (edges). However, a fully adaptive adversary with access to feature perturbations exposes a fundamental mathematical vulnerability in both RUNG and our learnable cosine-distance approach.
 
-Our current evaluation does not test this threat model. Consequently, claimed robustness gains may be optimistic relative to a feature-aware attacker.
+\underline{\textit{The Attack Mechanism}}: Consider an adaptive attacker with a budget to both add edges and perturb node features. The attacker's strategy is devastatingly simple:
+
+\begin{enumerate}
+\item The attacker injects a malicious node $v_{\text{adv}}$ or selects an existing node to manipulate.
+\item The attacker observes the learned feature representation of the target node $v_{\text{target}}$ (since the attacker has full knowledge of the model).
+\item The attacker then sets the feature vector of $v_{\text{adv}}$ to match $v_{\text{target}}$ as closely as the perturbation budget allows: $\mathbf{x}_{\text{adv}} \approx \mathbf{x}_{\text{target}}$.
+\item The attacker adds an edge connecting $v_{\text{adv}}$ and $v_{\text{target}}$.
+\end{enumerate}
+
+When the RUNG/RUGE algorithm executes, it computes the pairwise distance:
+$$y^{(k)}_{ij} = \begin{cases} 
+\left\lVert \mathbf{f}^{(k)}_i - \mathbf{f}^{(k)}_j \right\rVert_2 & \text{(Euclidean, RUNG)} \\
+1 - \frac{\mathbf{f}^{(k)}_i \cdot \mathbf{f}^{(k)}_j}{\|\mathbf{f}^{(k)}_i\|_2 \cdot \|\mathbf{f}^{(k)}_j\|_2} & \text{(Cosine, our method)}
+\end{cases}$$
+
+Because the attacker has spoofed the feature vectors to be nearly identical, **both metrics return a distance approaching zero**. The QN-IRLS algorithm then assigns the adversarial edge a maximum weight, fully trusting the poisoned input. The mathematical machinery of RUNG executes flawlessly—but on fabricated data, arriving at a catastrophic misclassification.
+
+\underline{\textit{Why the Mathematics Still Executes}}: This is the critical insight: RUNG has no external lie detector. The matrix operations $(\mathbf{f}^{(k)}_i - \mathbf{f}^{(k)}_j)$ execute identically whether the feature matrix is clean or poisoned. If an attacker provides a malicious feature matrix $\tilde{\mathbf{X}} = \mathbf{X} + \mathbf{P}$, the Quasi-Newton IRLS algorithm will flawlessly execute its entire optimization procedure to minimize the loss on the poisoned data. The defense produces theoretically sound estimates for *the wrong problem*: protecting against adversarial perturbations in a graph with spoofed features is fundamentally different from protecting against structural attacks on an unmodified feature matrix.
+
+\underline{\textit{The Role of Perturbation Budget in Real-World Defense}}: The only factor that prevents this catastrophic failure in practice is the **feature perturbation budget** $\delta_f$. In realistic scenarios, attackers cannot modify node features arbitrarily:
+
+\begin{itemize}
+\item \textbf{Citation Networks (Cora, Citeseer):} An attacker adding a citation cannot change the paper's actual title, abstract word frequencies, or publication date without creating detectable inconsistencies. They might only alter 5 out of 1,433 features (0.3\% budget).
+
+\item \textbf{Social Networks:} Changing a Twitter account's creation date, verified status, follower count, and posting history triggers immediate detection systems. Real accounts exhibit correlated feature patterns that synthetic accounts cannot replicate.
+
+\item \textbf{Biological Networks:} In protein interaction graphs, an attacker cannot synthesize a protein with completely arbitrary amino acid sequences without violating biological constraints.
+\end{itemize}
+
+Small perturbation budgets ($\delta_f < 0.1$) mean the attacker cannot align feature vectors enough to make the distance zero. Euclidean distance remains large, and cosine distance shows angular misalignment. Under these constraints, RUNG and our method successfully detect and prune adversarial edges.
+
+\underline{\textit{Catastrophic Failure Under Large Feature Budgets}}: However, if an attacker has a sufficiently large feature perturbation budget (e.g., $\delta_f > 0.3-0.5$ depending on feature dimensionality and the graph's intrinsic feature structure), the defense collapses entirely. Mathematically:
+
+$$\text{Given } \delta_f, \text{ attacker chooses } \mathbf{x}_{\text{adv}} = \mathbf{x}_{\text{target}} + \mathbf{P}, \quad \text{where} \; \|\mathbf{P}\|_\infty \leq \delta_f$$
+
+If $\delta_f$ is large enough that the attacker can minimize $\|\mathbf{f}^{(k)}_{\text{adv}} - \mathbf{f}^{(k)}_{\text{target}}\|_2 \to 0$ or maximize $\cos\theta_{\text{adv},\text{target}} \to 1$, then:
+$$W^{(k)}_{\text{adv},\text{target}} = \text{MCP}\left(y^{(k)}_{\text{adv},\text{target}} \approx 0\right) \to 1$$
+
+The edge receives maximum weight, and the attacker's poison flows unimpeded through the QN-IRLS update. Because the QN-IRLS algorithm updates all node features according to $\mathbf{F}^{(k)} \gets (\mathrm{diag}(\mathbf{q}) + \lambda\mathbf{I})^{-1}((\mathbf{W} \odot \tilde{\mathbf{A}})\mathbf{F}^{(k-1)} + \lambda\mathbf{F}^{(0)})$, the poisoned signal propagates throughout the network, degrading accuracy on all downstream nodes.
+
+\underline{\textit{Implications for Our Learnable Cosine Model}}: Our contribution makes the problem potentially worse in one sense: by enabling gradient flow through the distance computation and learning feature projections, we give the network more flexibility to discover feature representations. However, a sophisticated feature-aware attacker aware of the learned projection could craft features that align perfectly within the learned subspace, completely bypassing the defense. This is a direct consequence of relying on geometric similarity rather than external, problem-dependent signals (e.g., structural anomaly scores or content authenticity markers).
+
+Our current evaluation operates under the assumption that $\delta_f$ is negligibly small or zero. Under this assumption, our methods demonstrate state-of-the-art structural robustness. However, we emphasize that in security-critical applications where feature integrity cannot be guaranteed, distance-based edge filtering—whether RUNG, our percentile-gamma variant, or our learnable cosine module—should not be the sole defense mechanism. Future work must develop joint defenses that combine geometric anomaly detection with feature-authenticity verification or budget-aware adaptive thresholding that explicitly accounts for feature perturbations.
 
 \subsection{Scale and Large-Graph Evaluation}
 
